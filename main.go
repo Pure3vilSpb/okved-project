@@ -2,59 +2,49 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
-	"os"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
 )
 
-type Student struct {
-	Rating []int `json:"Rating"`
-}
-
-type Group struct {
-	Students []Student `json:"Students"`
-}
-
-type Result struct {
-	Average float64 `json:"Average"`
+type OkvedItem struct {
+	GlobalID int64 `json:"global_id"`
 }
 
 func main() {
-	// Читаем данные из stdin
-	data, err := ioutil.ReadAll(os.Stdin)
+	// Прямая ссылка на файл в репозитории
+	url := "https://raw.githubusercontent.com/semyon-dev/stepik-go/master/work_with_json/data-20190514T0100.json"
+
+	// Выполняем HTTP GET запрос
+	resp, err := http.Get(url)
 	if err != nil {
-		return
+		log.Fatalf("Ошибка при запросе к GitHub: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Проверяем статус ответа
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("Ошибка HTTP: %s", resp.Status)
+	}
+
+	// Читаем тело ответа
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Ошибка чтения тела ответа: %v", err)
 	}
 
 	// Декодируем JSON
-	var group Group
-	if err := json.Unmarshal(data, &group); err != nil {
-		return
+	var items []OkvedItem
+	if err := json.Unmarshal(body, &items); err != nil {
+		log.Fatalf("Ошибка декодирования JSON: %v", err)
 	}
 
-	// Вычисляем среднее количество оценок
-	var totalRatings int
-	studentCount := len(group.Students)
-
-	for _, student := range group.Students {
-		totalRatings += len(student.Rating)
+	// Вычисляем сумму global_id
+	var sum int64
+	for _, item := range items {
+		sum += item.GlobalID
 	}
 
-	average := 0.0
-	if studentCount > 0 {
-		average = float64(totalRatings) / float64(studentCount)
-	}
-
-	// Формируем результат
-	result := Result{
-		Average: average,
-	}
-
-	// Кодируем результат в JSON с отступами
-	output, err := json.MarshalIndent(result, "", "    ")
-	if err != nil {
-		return
-	}
-
-	// Выводим результат
-	os.Stdout.Write(output)
+	fmt.Println(sum)
 }
